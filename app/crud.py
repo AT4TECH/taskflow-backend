@@ -5,8 +5,11 @@ from app.models import Task
 from app.schemas import TaskCreate, TaskUpdate
 
 
-def get_tasks(db: Session) -> list[Task]:
-    return list(db.scalars(select(Task).order_by(Task.id)))
+def get_tasks(db: Session, status: str | None = None) -> list[Task]:
+    stmt = select(Task).order_by(Task.id)
+    if status is not None:
+        stmt = stmt.where(Task.status == status)
+    return list(db.scalars(stmt))
 
 
 def get_task(db: Session, task_id: int) -> Task | None:
