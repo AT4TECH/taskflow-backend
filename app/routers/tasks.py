@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app import crud
 from app.database import get_db
-from app.schemas import TaskCreate, TaskRead, TaskUpdate
+from app.schemas import TaskCreate, TaskRead, TaskStatus, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -19,8 +19,11 @@ def create_task(
 
 
 @router.get("", response_model=list[TaskRead])
-def read_tasks(db: Annotated[Session, Depends(get_db)]) -> list[TaskRead]:
-    return crud.get_tasks(db)
+def read_tasks(
+    db: Annotated[Session, Depends(get_db)],
+    status: TaskStatus | None = None,
+) -> list[TaskRead]:
+    return crud.get_tasks(db, status=status.value if status is not None else None)
 
 
 @router.get("/{task_id}", response_model=TaskRead)

@@ -148,3 +148,92 @@ def test_cors_allows_only_local_frontend(client: TestClient) -> None:
     )
     assert disallowed.status_code == 400
     assert "access-control-allow-origin" not in disallowed.headers
+
+
+def create_task_with_status(client: TestClient, status: str) -> dict[str, object]:
+    payload = task_payload()
+    payload["status"] = status
+    response = client.post("/tasks", json=payload)
+    assert response.status_code == 201
+    return response.json()
+
+
+def test_list_tasks_without_filter_returns_all(client: TestClient) -> None:
+    pendiente = create_task_with_status(client, "pendiente")
+    en_progreso = create_task_with_status(client, "en_progreso")
+    completada = create_task_with_status(client, "completada")
+
+    response = client.get("/tasks")
+
+    assert response.status_code == 200
+    assert response.json() == [pendiente, en_progreso, completada]
+
+
+def test_list_tasks_filters_by_pendiente(client: TestClient) -> None:
+    pendiente = create_task_with_status(client, "pendiente")
+    create_task_with_status(client, "en_progreso")
+    create_task_with_status(client, "completada")
+
+    response = client.get("/tasks", params={"status": "pendiente"})
+
+    assert response.status_code == 200
+    assert response.json() == [pendiente]
+
+
+def test_list_tasks_filters_by_en_progreso(client: TestClient) -> None:
+    create_task_with_status(client, "pendiente")
+    en_progreso = create_task_with_status(client, "en_progreso")
+    create_task_with_status(client, "completada")
+
+    response = client.get("/tasks", params={"status": "en_progreso"})
+
+    assert response.status_code == 200
+    assert response.json() == [en_progreso]
+
+
+def test_list_tasks_filters_by_completada(client: TestClient) -> None:
+    create_task_with_status(client, "pendiente")
+    create_task_with_status(client, "en_progreso")
+    completada = create_task_with_status(client, "completada")
+
+    response = client.get("/tasks", params={"status": "completada"})
+
+    assert response.status_code == 200
+    assert response.json() == [completada]
+
+
+def test_list_tasks_filter_with_no_matches_returns_empty_list(
+    client: TestClient,
+) -> None:
+    create_task_with_status(client, "pendiente")
+
+    response = client.get("/tasks", params={"status": "completada"})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_tasks_rejects_invalid_status(client: TestClient) -> None:
+    response = client.get("/tasks", params={"status": "bloqueada"})
+
+    assert response.status_code == 422
+
+
+def test_list_tasks_filter_preserves_id_order_and_json_shape(
+    client: TestClient,
+) -> None:
+    first = create_task_with_status(client, "pendiente")
+    create_task_with_status(client, "completada")
+    third = create_task_with_status(client, "pendiente")
+
+    response = client.get("/tasks", params={"status": "pendiente"})
+
+    assert response.status_code == 200
+    assert response.json() == [first, third]
+    assert list(response.json()[0].keys()) == [
+        "id",
+        "title",
+        "description",
+        "priority",
+        "status",
+    ]
